@@ -59,3 +59,78 @@ export const UserApi = {
     return unwrap<unknown>(res.data);
   },
 };
+
+// Export low-level client for custom requests in pages (e.g., admin dashboard)
+export const http = api;
+
+// Category endpoints
+export const CategoryApi = {
+  list: async (token: string, params?: Record<string, unknown>) => {
+    const res = await api.get<ApiEnvelope<unknown>>("/categories", {
+      headers: { Authorization: `Bearer ${token}` },
+      params,
+    });
+    return unwrap<unknown>(res.data);
+  },
+  get: async (token: string, id: string) => {
+    const res = await api.get<ApiEnvelope<unknown>>(`/categories/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return unwrap<unknown>(res.data);
+  },
+  create: async (
+    token: string,
+    payload: {
+      name: string;
+      description?: string;
+      image?: string;
+      parentId?: string | null;
+      isActive?: boolean;
+    }
+  ) => {
+    const res = await api.post<ApiEnvelope<unknown>>("/categories", payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return unwrap<unknown>(res.data);
+  },
+  update: async (
+    token: string,
+    id: string,
+    payload: {
+      name?: string;
+      description?: string;
+      image?: string;
+      parentId?: string | null;
+      isActive?: boolean;
+    }
+  ) => {
+    const res = await api.patch<ApiEnvelope<unknown>>(
+      `/categories/${id}`,
+      payload,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return unwrap<unknown>(res.data);
+  },
+  remove: async (token: string, id: string) => {
+    const res = await api.delete<ApiEnvelope<unknown>>(`/categories/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return unwrap<unknown>(res.data);
+  },
+  uploadImage: async (token: string, id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await api.post<ApiEnvelope<unknown>>(
+      `/categories/${id}/upload-image`,
+      form,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // Let the browser set proper multipart boundaries
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return unwrap<unknown>(res.data);
+  },
+};
