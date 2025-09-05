@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -256,7 +254,7 @@ export function LandingPage() {
               Why Choose FreshCart?
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              We're committed to bringing you the freshest groceries with
+              We&apos;re committed to bringing you the freshest groceries with
               unmatched convenience
             </p>
           </div>
@@ -294,7 +292,7 @@ export function LandingPage() {
                 Quality Guaranteed
               </h3>
               <p className="text-gray-600">
-                Not satisfied? We'll replace it or refund your money - no
+                Not satisfied? We&apos;ll replace it or refund your money - no
                 questions asked
               </p>
             </div>

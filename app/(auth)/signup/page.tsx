@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,101 +13,56 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Leaf, Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
+import { Leaf, Lock, User as UserIcon, Mail } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 
+type SignupForm = {
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  acceptTerms: boolean;
+};
+
 export default function SignupPage() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    password: "",
-    confirmPassword: "",
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [acceptTerms, setAcceptTerms] = useState(false);
-
-  const { register, isLoading } = useAuthStore();
   const router = useRouter();
+  const { register: signup, isLoading } = useAuthStore();
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+    setError,
+  } = useForm<SignupForm>({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      username: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      acceptTerms: false,
+    },
+  });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
-  };
+  const password = watch("password");
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = "First name is required";
-    }
-
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = "Last name is required";
-    }
-
-    if (!formData.email) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email";
-    }
-
-    if (formData.phone && !/^\+?[\d\s\-\(\)]+$/.test(formData.phone)) {
-      newErrors.phone = "Please enter a valid phone number";
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password =
-        "Password must contain at least one uppercase letter, lowercase letter, and number";
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-
-    if (!acceptTerms) {
-      newErrors.terms = "You must accept the terms and conditions";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) return;
-
+  const onSubmit = async (values: SignupForm) => {
     try {
-      await register({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        password: formData.password,
-        phone: formData.phone || undefined,
+      await signup({
+        firstName: values.firstName,
+        lastName: values.lastName,
+        username: values.username,
+        email: values.email,
+        password: values.password,
       });
       router.push("/");
-    } catch (error) {
-      setErrors({
-        submit: "An error occurred during registration. Please try again.",
-      });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Signup failed";
+      setError("root", { message });
     }
-  };
-
-  const handleGoogleSignup = () => {
-    // This will be implemented later with Google OAuth
-    console.log("Google signup clicked");
   };
 
   return (
@@ -137,11 +92,11 @@ export default function SignupPage() {
             </CardDescription>
           </CardHeader>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit(onSubmit)}>
             <CardContent className="space-y-4">
-              {errors.submit && (
+              {errors.root?.message && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
-                  {errors.submit}
+                  {errors.root.message}
                 </div>
               )}
 
@@ -152,22 +107,22 @@ export default function SignupPage() {
                     First Name
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
                       id="firstName"
-                      name="firstName"
-                      type="text"
-                      autoComplete="given-name"
                       placeholder="First name"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      className={`pl-10 ${
-                        errors.firstName ? "border-red-500" : ""
-                      }`}
+                      className={
+                        errors.firstName ? "border-red-500 pl-10" : "pl-10"
+                      }
+                      {...register("firstName", {
+                        required: "First name is required",
+                      })}
                     />
                   </div>
                   {errors.firstName && (
-                    <p className="text-red-500 text-xs">{errors.firstName}</p>
+                    <p className="text-red-500 text-xs">
+                      {errors.firstName.message}
+                    </p>
                   )}
                 </div>
 
@@ -177,18 +132,39 @@ export default function SignupPage() {
                   </label>
                   <Input
                     id="lastName"
-                    name="lastName"
-                    type="text"
-                    autoComplete="family-name"
                     placeholder="Last name"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
                     className={errors.lastName ? "border-red-500" : ""}
+                    {...register("lastName", {
+                      required: "Last name is required",
+                    })}
                   />
                   {errors.lastName && (
-                    <p className="text-red-500 text-xs">{errors.lastName}</p>
+                    <p className="text-red-500 text-xs">
+                      {errors.lastName.message}
+                    </p>
                   )}
                 </div>
+              </div>
+
+              {/* Username */}
+              <div className="space-y-2">
+                <label htmlFor="username" className="text-sm font-medium">
+                  Username
+                </label>
+                <Input
+                  id="username"
+                  placeholder="Choose a username"
+                  className={errors.username ? "border-red-500" : ""}
+                  {...register("username", {
+                    required: "Username is required",
+                    minLength: { value: 3, message: "At least 3 characters" },
+                  })}
+                />
+                {errors.username && (
+                  <p className="text-red-500 text-xs">
+                    {errors.username.message}
+                  </p>
+                )}
               </div>
 
               {/* Email */}
@@ -197,43 +173,23 @@ export default function SignupPage() {
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
                     id="email"
-                    name="email"
                     type="email"
-                    autoComplete="email"
                     placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className={`pl-10 ${errors.email ? "border-red-500" : ""}`}
+                    className={errors.email ? "border-red-500 pl-10" : "pl-10"}
+                    {...register("email", {
+                      required: "Email is required",
+                      pattern: {
+                        value: /\S+@\S+\.\S+/,
+                        message: "Enter a valid email",
+                      },
+                    })}
                   />
                 </div>
                 {errors.email && (
-                  <p className="text-red-500 text-xs">{errors.email}</p>
-                )}
-              </div>
-
-              {/* Phone */}
-              <div className="space-y-2">
-                <label htmlFor="phone" className="text-sm font-medium">
-                  Phone Number (Optional)
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    autoComplete="tel"
-                    placeholder="Enter your phone number"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className={`pl-10 ${errors.phone ? "border-red-500" : ""}`}
-                  />
-                </div>
-                {errors.phone && (
-                  <p className="text-red-500 text-xs">{errors.phone}</p>
+                  <p className="text-red-500 text-xs">{errors.email.message}</p>
                 )}
               </div>
 
@@ -243,33 +199,25 @@ export default function SignupPage() {
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
                     id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
+                    type="password"
                     autoComplete="new-password"
                     placeholder="Create a password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className={`pl-10 pr-10 ${
-                      errors.password ? "border-red-500" : ""
-                    }`}
+                    className={
+                      errors.password ? "border-red-500 pl-10" : "pl-10"
+                    }
+                    {...register("password", {
+                      required: "Password is required",
+                      minLength: { value: 8, message: "At least 8 characters" },
+                    })}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
                 </div>
                 {errors.password && (
-                  <p className="text-red-500 text-xs">{errors.password}</p>
+                  <p className="text-red-500 text-xs">
+                    {errors.password.message}
+                  </p>
                 )}
               </div>
 
@@ -282,34 +230,24 @@ export default function SignupPage() {
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
                     id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
+                    type="password"
                     autoComplete="new-password"
                     placeholder="Confirm your password"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    className={`pl-10 pr-10 ${
-                      errors.confirmPassword ? "border-red-500" : ""
-                    }`}
+                    className={
+                      errors.confirmPassword ? "border-red-500 pl-10" : "pl-10"
+                    }
+                    {...register("confirmPassword", {
+                      validate: (v: string) =>
+                        v === password || "Passwords do not match",
+                    })}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
                 </div>
                 {errors.confirmPassword && (
                   <p className="text-red-500 text-xs">
-                    {errors.confirmPassword}
+                    {errors.confirmPassword.message}
                   </p>
                 )}
               </div>
@@ -318,15 +256,16 @@ export default function SignupPage() {
               <div className="space-y-2">
                 <div className="flex items-center">
                   <input
-                    id="accept-terms"
-                    name="accept-terms"
+                    id="acceptTerms"
                     type="checkbox"
-                    checked={acceptTerms}
-                    onChange={(e) => setAcceptTerms(e.target.checked)}
                     className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                    {...register("acceptTerms", {
+                      validate: (v: boolean) =>
+                        v || "You must accept the terms and conditions",
+                    })}
                   />
                   <label
-                    htmlFor="accept-terms"
+                    htmlFor="acceptTerms"
                     className="ml-2 block text-sm text-gray-700"
                   >
                     I agree to the{" "}
@@ -345,8 +284,10 @@ export default function SignupPage() {
                     </Link>
                   </label>
                 </div>
-                {errors.terms && (
-                  <p className="text-red-500 text-xs">{errors.terms}</p>
+                {errors.acceptTerms && (
+                  <p className="text-red-500 text-xs">
+                    {errors.acceptTerms.message}
+                  </p>
                 )}
               </div>
             </CardContent>
@@ -354,44 +295,6 @@ export default function SignupPage() {
             <CardFooter className="flex flex-col space-y-4">
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Creating account..." : "Create Account"}
-              </Button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleGoogleSignup}
-              >
-                <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  />
-                </svg>
-                Continue with Google
               </Button>
 
               <p className="text-center text-sm text-gray-600">

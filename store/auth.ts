@@ -1,48 +1,38 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { AuthApi, UserApi } from "@/lib/api/client";
 
-export interface User {
+export interface AuthUser {
   id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  role: "USER" | "ADMIN";
-  isEmailVerified: boolean;
-  profileImage?: string;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Address {
-  id: string;
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
-  type: "HOME" | "WORK" | "OTHER";
-  isDefault: boolean;
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  role: "user" | "admin" | string;
+  profile?: Record<string, unknown> | null;
 }
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
   // Actions
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   register: (userData: {
     email: string;
     password: string;
     firstName: string;
     lastName: string;
-    phone?: string;
+    username: string;
   }) => Promise<void>;
+  fetchMe: () => Promise<void>;
   logout: () => void;
-  setUser: (user: User) => void;
-  setToken: (token: string) => void;
+  setUser: (user: AuthUser | null) => void;
+  setToken: (token: string | null) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -53,30 +43,20 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
 
-      login: async (email: string, password: string) => {
+      login: async (identifier: string, password: string) => {
         set({ isLoading: true });
         try {
-          // This will be implemented later with actual API calls
-          // const response = await fetch('/api/auth/login', {
-          //   method: 'POST',
-          //   headers: { 'Content-Type': 'application/json' },
-          //   body: JSON.stringify({ email, password })
-          // })
-          // const data = await response.json()
-
-          // Mock implementation for now
-          console.log("Login attempt:", { email, password });
-
-          // Simulate API call
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          set({
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        } catch (error) {
-          console.error("Login error:", error);
+          const { accessToken } = await AuthApi.login({ identifier, password });
+          set({ token: accessToken, isAuthenticated: true });
+          await get().fetchMe();
           set({ isLoading: false });
+        } catch (error) {
+          set({
+            isLoading: false,
+            token: null,
+            isAuthenticated: false,
+            user: null,
+          });
           throw error;
         }
       },
@@ -84,20 +64,25 @@ export const useAuthStore = create<AuthState>()(
       register: async (userData) => {
         set({ isLoading: true });
         try {
-          // This will be implemented later with actual API calls
-          console.log("Register attempt:", userData);
-
-          // Simulate API call
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          set({
-            isAuthenticated: true,
-            isLoading: false,
-          });
+          await UserApi.signup(userData);
+          // Auto login after successful signup using email as identifier
+          await get().login(userData.email, userData.password);
+          set({ isLoading: false });
         } catch (error) {
-          console.error("Register error:", error);
           set({ isLoading: false });
           throw error;
+        }
+      },
+
+      fetchMe: async () => {
+        const token = get().token;
+        if (!token) return;
+        try {
+          const me = (await AuthApi.me(token)) as AuthUser;
+          set({ user: me, isAuthenticated: true });
+        } catch {
+          // token invalid/expired
+          set({ user: null, token: null, isAuthenticated: false });
         }
       },
 
@@ -110,12 +95,12 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      setUser: (user: User) => {
-        set({ user, isAuthenticated: true });
+      setUser: (user: AuthUser | null) => {
+        set({ user, isAuthenticated: !!user });
       },
 
-      setToken: (token: string) => {
-        set({ token });
+      setToken: (token: string | null) => {
+        set({ token, isAuthenticated: !!token });
       },
     }),
     {
