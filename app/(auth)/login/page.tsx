@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -23,7 +24,7 @@ type LoginForm = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading } = useAuthStore();
+  const { login, isLoading, isAuthenticated } = useAuthStore();
   const {
     register,
     handleSubmit,
@@ -36,19 +37,34 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginForm) => {
     try {
       await login(values.identifier, values.password);
-      router.push("/");
+      // role-based redirect using latest state
+      const role = useAuthStore.getState().user?.role?.toLowerCase();
+      if (role === "admin") router.push("/admin");
+      else router.push("/");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Login failed";
       setError("root", { message });
     }
   };
 
+  // Redirect away from login if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const role = useAuthStore.getState().user?.role?.toLowerCase();
+      if (role === "admin") router.replace("/admin");
+      else router.replace("/");
+    }
+  }, [isAuthenticated, router]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Logo */}
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center space-x-2">
+          <Link
+            href="/"
+            className="inline-flex items-center space-x-2 cursor-pointer"
+          >
             <div className="flex items-center justify-center w-12 h-12 bg-primary rounded-full">
               <Leaf className="h-7 w-7 text-primary-foreground" />
             </div>
@@ -129,7 +145,7 @@ export default function LoginPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="flex items-center">
+                <div className="flex items-center cursor-pointer">
                   <input
                     id="remember-me"
                     name="remember-me"
@@ -138,22 +154,21 @@ export default function LoginPage() {
                   />
                   <label
                     htmlFor="remember-me"
-                    className="ml-2 block text-sm text-gray-700"
+                    className="ml-2 block text-sm text-gray-700 cursor-pointer"
                   >
                     Remember me
                   </label>
                 </div>
-                <Link
-                  href="/forgot-password"
-                  className="text-sm text-primary hover:text-primary/80 font-medium"
-                >
-                  Forgot password?
-                </Link>
+                {/* Forgot password removed as requested */}
               </div>
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-4">
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full cursor-pointer"
+                disabled={isLoading}
+              >
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
 
@@ -161,7 +176,7 @@ export default function LoginPage() {
                 Don&apos;t have an account?{" "}
                 <Link
                   href="/signup"
-                  className="text-primary hover:text-primary/80 font-medium"
+                  className="text-primary hover:text-primary/80 font-medium cursor-pointer"
                 >
                   Sign up here
                 </Link>

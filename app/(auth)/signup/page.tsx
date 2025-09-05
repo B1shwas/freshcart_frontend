@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -28,7 +29,7 @@ type SignupForm = {
 
 export default function SignupPage() {
   const router = useRouter();
-  const { register: signup, isLoading } = useAuthStore();
+  const { register: signup, isLoading, isAuthenticated } = useAuthStore();
   const {
     register,
     handleSubmit,
@@ -58,19 +59,33 @@ export default function SignupPage() {
         email: values.email,
         password: values.password,
       });
-      router.push("/");
+      const role = useAuthStore.getState().user?.role?.toLowerCase();
+      if (role === "admin") router.push("/admin");
+      else router.push("/");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Signup failed";
       setError("root", { message });
     }
   };
 
+  // Redirect away from signup if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const role = useAuthStore.getState().user?.role?.toLowerCase();
+      if (role === "admin") router.replace("/admin");
+      else router.replace("/");
+    }
+  }, [isAuthenticated, router]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Logo */}
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center space-x-2">
+          <Link
+            href="/"
+            className="inline-flex items-center space-x-2 cursor-pointer"
+          >
             <div className="flex items-center justify-center w-12 h-12 bg-primary rounded-full">
               <Leaf className="h-7 w-7 text-primary-foreground" />
             </div>
@@ -258,7 +273,7 @@ export default function SignupPage() {
                   <input
                     id="acceptTerms"
                     type="checkbox"
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded cursor-pointer"
                     {...register("acceptTerms", {
                       validate: (v: boolean) =>
                         v || "You must accept the terms and conditions",
@@ -266,19 +281,19 @@ export default function SignupPage() {
                   />
                   <label
                     htmlFor="acceptTerms"
-                    className="ml-2 block text-sm text-gray-700"
+                    className="ml-2 block text-sm text-gray-700 cursor-pointer"
                   >
                     I agree to the{" "}
                     <Link
                       href="/terms"
-                      className="text-primary hover:text-primary/80 font-medium"
+                      className="text-primary hover:text-primary/80 font-medium cursor-pointer"
                     >
                       Terms of Service
                     </Link>{" "}
                     and{" "}
                     <Link
                       href="/privacy"
-                      className="text-primary hover:text-primary/80 font-medium"
+                      className="text-primary hover:text-primary/80 font-medium cursor-pointer"
                     >
                       Privacy Policy
                     </Link>
@@ -293,7 +308,11 @@ export default function SignupPage() {
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-4">
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full cursor-pointer"
+                disabled={isLoading}
+              >
                 {isLoading ? "Creating account..." : "Create Account"}
               </Button>
 
@@ -301,7 +320,7 @@ export default function SignupPage() {
                 Already have an account?{" "}
                 <Link
                   href="/login"
-                  className="text-primary hover:text-primary/80 font-medium"
+                  className="text-primary hover:text-primary/80 font-medium cursor-pointer"
                 >
                   Sign in here
                 </Link>
