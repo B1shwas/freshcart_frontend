@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/card";
 import { Leaf, Lock, User as UserIcon } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
+import { UserProfileApi } from "@/lib/api/userProfile";
+import { isAxiosError } from "axios";
 
 type LoginForm = {
   identifier: string; // email or username
@@ -37,10 +39,20 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginForm) => {
     try {
       await login(values.identifier, values.password);
-      // role-based redirect using latest state
-      const role = useAuthStore.getState().user?.role?.toLowerCase();
-      if (role === "admin") router.push("/admin");
-      else router.push("/");
+      const state = useAuthStore.getState();
+      const token = state.token;
+      let hasProfile = true;
+      if (token) {
+        try {
+          await UserProfileApi.get(token);
+        } catch (e) {
+          if (isAxiosError(e) && e.response?.status === 404) {
+            hasProfile = false;
+          }
+        }
+      }
+      // Always send user to profile page (whether profile exists or not) so they can view or edit
+      router.push("/profile");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Login failed";
       setError("root", { message });
@@ -49,11 +61,21 @@ export default function LoginPage() {
 
   // Redirect away from login if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      const role = useAuthStore.getState().user?.role?.toLowerCase();
-      if (role === "admin") router.replace("/admin");
-      else router.replace("/");
-    }
+    if (!isAuthenticated) return;
+    const run = async () => {
+      const state = useAuthStore.getState();
+      const token = state.token;
+      let hasProfile = true;
+      if (token) {
+        try {
+          await UserProfileApi.get(token);
+        } catch (e) {
+          if (isAxiosError(e) && e.response?.status === 404) hasProfile = false;
+        }
+      }
+      router.replace("/profile");
+    };
+    run();
   }, [isAuthenticated, router]);
 
   return (

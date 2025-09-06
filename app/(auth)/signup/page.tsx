@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/card";
 import { Leaf, Lock, User as UserIcon, Mail } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
+import { UserProfileApi } from "@/lib/api/userProfile";
+import { isAxiosError } from "axios";
 
 type SignupForm = {
   firstName: string;
@@ -59,9 +61,17 @@ export default function SignupPage() {
         email: values.email,
         password: values.password,
       });
-      const role = useAuthStore.getState().user?.role?.toLowerCase();
-      if (role === "admin") router.push("/admin");
-      else router.push("/");
+      const state = useAuthStore.getState();
+      const token = state.token;
+      let hasProfile = true;
+      if (token) {
+        try {
+          await UserProfileApi.get(token);
+        } catch (e) {
+          if (isAxiosError(e) && e.response?.status === 404) hasProfile = false;
+        }
+      }
+      router.push("/profile");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Signup failed";
       setError("root", { message });
@@ -70,11 +80,21 @@ export default function SignupPage() {
 
   // Redirect away from signup if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      const role = useAuthStore.getState().user?.role?.toLowerCase();
-      if (role === "admin") router.replace("/admin");
-      else router.replace("/");
-    }
+    if (!isAuthenticated) return;
+    const run = async () => {
+      const state = useAuthStore.getState();
+      const token = state.token;
+      let hasProfile = true;
+      if (token) {
+        try {
+          await UserProfileApi.get(token);
+        } catch (e) {
+          if (isAxiosError(e) && e.response?.status === 404) hasProfile = false;
+        }
+      }
+      router.replace("/profile");
+    };
+    run();
   }, [isAuthenticated, router]);
 
   return (
