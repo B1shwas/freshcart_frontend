@@ -35,10 +35,10 @@ export default function AdminDashboardPage() {
       try {
         // These endpoints are placeholders. Replace with actual ones as they become available.
         const [productsRes, categoriesRes] = await Promise.all([
-          http.get("/product", {
+          http.get("/products", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          http.get("/category", {
+          http.get("/categories", {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);

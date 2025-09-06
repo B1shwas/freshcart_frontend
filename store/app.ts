@@ -5,18 +5,17 @@ export interface Product {
   name: string;
   description: string;
   price: number;
-  originalPrice?: number;
+  discountedPrice?: number;
+  discountPercentage?: number;
   images: string[];
   category: {
     id: string;
     name: string;
     image?: string;
   };
-  stock: number;
-  unit: string; // kg, lbs, pieces, etc.
-  isOrganic: boolean;
+  stockQuantity: number;
+  unit: "kg" | "g" | "l" | "ml" | "pc" | "dozen" | "pack" | "bundle"; // allowed units
   isFeatured: boolean;
-  discount?: number;
   rating: number;
   reviewCount: number;
   nutritionFacts?: {

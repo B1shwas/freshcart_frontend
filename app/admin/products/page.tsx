@@ -3,43 +3,43 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, FolderTree } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthStore } from "@/store/auth";
-import { CategoryApi } from "@/lib/api/client";
-import type { Category } from "@/types/api";
+import { ProductApi } from "@/lib/api/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-export default function AdminCategoriesPage() {
+type Product = any;
+
+export default function AdminProductsPage() {
   const router = useRouter();
-  const { token, isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, token } = useAuthStore();
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) return; // let higher-level redirects handle
+    if (!isAuthenticated) return;
     if (!isAdmin) router.replace("/");
   }, [isAuthenticated, isAdmin, router]);
 
   const load = async () => {
-    if (!token) return;
     setLoading(true);
     setError(null);
     try {
-      const data = (await CategoryApi.list(token)) as any;
-      const items: Category[] = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-        ? data.items
+      const data = (await ProductApi.list()) as any;
+      const items = Array.isArray(data.products)
+        ? data.products
+        : Array.isArray(data?.products)
+        ? data.products
         : [];
-      setCategories(items);
+      setProducts(items);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load categories");
+      setError(e instanceof Error ? e.message : "Failed to load products");
     } finally {
       setLoading(false);
     }
@@ -47,16 +47,15 @@ export default function AdminCategoriesPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, []);
 
   const handleDelete = (id: string) => setConfirmId(id);
   const onConfirmDelete = async () => {
     if (!token || !confirmId) return;
     setConfirmLoading(true);
     try {
-      await CategoryApi.remove(token, confirmId);
-      setCategories((prev) => prev.filter((c) => c.id !== confirmId));
+      await ProductApi.remove(token, confirmId);
+      setProducts((prev) => prev.filter((p: any) => p.id !== confirmId));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed");
     } finally {
@@ -65,21 +64,19 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  const sorted = useMemo(
-    () =>
-      [...categories].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
-    [categories]
-  );
+  const sorted = useMemo(() => {
+    return [...products].sort((a: any, b: any) => a.name.localeCompare(b.name));
+  }, [products]);
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <FolderTree className="h-6 w-6 text-primary" /> Categories
+          <Package className="h-6 w-6 text-primary" /> Products
         </h1>
-        <Link href="/admin/categories/create">
+        <Link href="/admin/products/create">
           <Button className="cursor-pointer">
-            <Plus className="h-4 w-4 mr-2" /> New Category
+            <Plus className="h-4 w-4 mr-2" /> New Product
           </Button>
         </Link>
       </div>
@@ -92,34 +89,42 @@ export default function AdminCategoriesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">All Categories</CardTitle>
+          <CardTitle className="text-base">All Products</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading...</p>
           ) : sorted.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No categories found.
-            </p>
+            <p className="text-sm text-muted-foreground">No products found.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="text-left border-b">
                     <th className="py-2 pr-4">Name</th>
-                    <th className="py-2 pr-4">Active</th>
-                    <th className="py-2 pr-4">Sort</th>
+                    <th className="py-2 pr-4">Price</th>
+                    <th className="py-2 pr-4">Stock</th>
+                    <th className="py-2 pr-4">Featured</th>
                     <th className="py-2 pr-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map((c) => (
-                    <tr key={c.id} className="border-b">
-                      <td className="py-2 pr-4 font-medium">{c.name}</td>
-                      <td className="py-2 pr-4">{c.isActive ? "Yes" : "No"}</td>
-                      <td className="py-2 pr-4">{c.sortOrder ?? 0}</td>
+                  {sorted.map((p: any) => (
+                    <tr key={p.id} className="border-b">
+                      <td className="py-2 pr-4 font-medium">{p.name}</td>
+                      <td className="py-2 pr-4">${p.price}</td>
+                      <td className="py-2 pr-4">
+                        {p.stockQuantity ?? p.stock}
+                      </td>
+                      <td className="py-2 pr-4 flex items-center gap-1">
+                        {p.isFeatured ? (
+                          <Star className="h-4 w-4 text-yellow-500" />
+                        ) : (
+                          "No"
+                        )}
+                      </td>
                       <td className="py-2 pr-4 space-x-2">
-                        <Link href={`/admin/categories/${c.id}/edit`}>
+                        <Link href={`/admin/products/${p.id}/edit`}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -131,8 +136,8 @@ export default function AdminCategoriesPage() {
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => handleDelete(c.id)}
                           className="cursor-pointer"
+                          onClick={() => handleDelete(p.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -147,8 +152,8 @@ export default function AdminCategoriesPage() {
       </Card>
       <ConfirmDialog
         open={!!confirmId}
-        title="Delete category?"
-        description="This will permanently remove the category."
+        title="Delete product?"
+        description="This will permanently remove the product."
         confirmText="Delete"
         onConfirm={onConfirmDelete}
         onCancel={() => setConfirmId(null)}
