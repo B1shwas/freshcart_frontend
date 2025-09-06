@@ -10,6 +10,8 @@ import { useAuthStore } from "@/store/auth";
 import { UserProfileApi } from "@/lib/api/client";
 import type { UserProfile } from "@/lib/api/userProfile";
 import { isAxiosError } from "axios";
+import AddressManager from "@/components/address-manager";
+import { useAuthInitialization } from "@/hooks/useAuthInitialization";
 
 interface ProfileForm {
   fullName: string;
@@ -25,6 +27,7 @@ interface ProfileForm {
 export default function ProfilePage() {
   const router = useRouter();
   const { token, user, setUser, isAuthenticated } = useAuthStore();
+  const { isInitialized } = useAuthInitialization();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -41,6 +44,9 @@ export default function ProfilePage() {
   } = useForm<ProfileForm>();
 
   useEffect(() => {
+    // Wait for auth to be initialized before checking authentication
+    if (!isInitialized) return;
+
     if (!isAuthenticated) {
       router.replace("/login");
       return;
@@ -90,7 +96,7 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, token, reset, setUser, user, router]);
+  }, [isInitialized, isAuthenticated, token, reset, setUser, user, router]);
 
   const onSubmit = async (values: ProfileForm) => {
     if (!token) return;
@@ -147,10 +153,10 @@ export default function ProfilePage() {
 
   // removed old standalone image upload/delete handlers
 
-  if (loading) {
+  if (!isInitialized || loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <p>Loading profile...</p>
+        <p>Loading...</p>
       </div>
     );
   }
@@ -169,13 +175,15 @@ export default function ProfilePage() {
               Edit Profile
             </Button>
           )}
-          <Button
-            variant="outline"
-            className="cursor-pointer"
-            onClick={() => router.push("/admin")}
-          >
-            Dashboard
-          </Button>
+          {user?.role === "admin" && (
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => router.push("/admin")}
+            >
+              Dashboard
+            </Button>
+          )}
         </div>
       </div>
 
@@ -442,6 +450,13 @@ export default function ProfilePage() {
             </form>
           </CardContent>
         </Card>
+      )}
+
+      {/* Address Management Section - Only for non-admin users */}
+      {user?.role !== "admin" && (
+        <div className="mt-6">
+          <AddressManager token={token || ""} />
+        </div>
       )}
     </div>
   );

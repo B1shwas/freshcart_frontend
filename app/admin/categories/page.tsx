@@ -21,6 +21,11 @@ export default function AdminCategoriesPage() {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
+  const selectedCategory = useMemo(
+    () => categories.find((c) => c.id === confirmId),
+    [categories, confirmId]
+  );
+
   useEffect(() => {
     if (!isAuthenticated) return; // let higher-level redirects handle
     if (!isAdmin) router.replace("/");
@@ -154,9 +159,14 @@ export default function AdminCategoriesPage() {
       </Card>
       <ConfirmDialog
         open={!!confirmId}
-        title="Delete category?"
-        description="This will permanently remove the category."
+        title="Delete Category"
+        description="Are you sure you want to delete this category? This will permanently remove the category."
+        itemDescription={
+          selectedCategory ? `Category: ${selectedCategory.name}` : ""
+        }
         confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
         onConfirm={onConfirmDelete}
         onCancel={() => setConfirmId(null)}
         loading={confirmLoading}

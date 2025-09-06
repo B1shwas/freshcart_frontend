@@ -19,6 +19,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isInitialized: boolean; // Add this to track if auth has been checked
 
   // Actions
   login: (identifier: string, password: string) => Promise<void>;
@@ -42,6 +43,7 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      isInitialized: false,
 
       login: async (identifier: string, password: string) => {
         set({ isLoading: true });
@@ -76,22 +78,30 @@ export const useAuthStore = create<AuthState>()(
 
       fetchMe: async () => {
         const token = get().token;
-        if (!token) return;
+        if (!token) {
+          set({ isInitialized: true });
+          return;
+        }
         try {
           const me = (await AuthApi.me(token)) as AuthUser;
-          set({ user: me, isAuthenticated: true });
+          set({ user: me, isAuthenticated: true, isInitialized: true });
         } catch {
           // token invalid/expired
-          set({ user: null, token: null, isAuthenticated: false });
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isInitialized: true,
+          });
         }
       },
-
       logout: () => {
         set({
           user: null,
           token: null,
           isAuthenticated: false,
           isLoading: false,
+          isInitialized: true,
         });
       },
 
@@ -109,6 +119,7 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
+        isInitialized: state.isInitialized,
       }),
     }
   )

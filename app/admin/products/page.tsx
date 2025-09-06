@@ -3,18 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Package, Star } from "lucide-react";
+import { Plus, Pencil, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthStore } from "@/store/auth";
 import { ProductApi } from "@/lib/api/client";
+import type { Product } from "@/types/api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-
-type Product = any;
 
 export default function AdminProductsPage() {
   const router = useRouter();
-  const { isAuthenticated, user, token } = useAuthStore();
+  const { token, isAuthenticated, user } = useAuthStore();
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,21 +21,29 @@ export default function AdminProductsPage() {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
+  const selectedProduct = useMemo(
+    () => products.find((p) => p.id === confirmId),
+    [products, confirmId]
+  );
+
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) return; // let higher-level redirects handle
     if (!isAdmin) router.replace("/");
   }, [isAuthenticated, isAdmin, router]);
 
   const load = async () => {
+    if (!token) return;
     setLoading(true);
     setError(null);
     try {
       const data = (await ProductApi.list()) as any;
-      const items = Array.isArray(data.products)
+      console.log(data);
+      const items: Product[] = Array.isArray(data.products)
         ? data.products
-        : Array.isArray(data?.products)
-        ? data.products
+        : Array.isArray(data?.items)
+        ? data.items
         : [];
+      console.log(items);
       setProducts(items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load products");
@@ -47,7 +54,8 @@ export default function AdminProductsPage() {
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const handleDelete = (id: string) => setConfirmId(id);
   const onConfirmDelete = async () => {
@@ -55,7 +63,7 @@ export default function AdminProductsPage() {
     setConfirmLoading(true);
     try {
       await ProductApi.remove(token, confirmId);
-      setProducts((prev) => prev.filter((p: any) => p.id !== confirmId));
+      setProducts((prev) => prev.filter((p) => p.id !== confirmId));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed");
     } finally {
@@ -64,9 +72,13 @@ export default function AdminProductsPage() {
     }
   };
 
-  const sorted = useMemo(() => {
-    return [...products].sort((a: any, b: any) => a.name.localeCompare(b.name));
-  }, [products]);
+  const sorted = useMemo(
+    () =>
+      [...products].sort((a, b) =>
+        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      ),
+    [products]
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -111,24 +123,20 @@ export default function AdminProductsPage() {
                     <th className="py-2 pr-4">Name</th>
                     <th className="py-2 pr-4">Price</th>
                     <th className="py-2 pr-4">Stock</th>
-                    <th className="py-2 pr-4">Featured</th>
+                    <th className="py-2 pr-4">Category</th>
+                    <th className="py-2 pr-4">Active</th>
                     <th className="py-2 pr-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map((p: any) => (
+                  {sorted.map((p) => (
                     <tr key={p.id} className="border-b">
                       <td className="py-2 pr-4 font-medium">{p.name}</td>
                       <td className="py-2 pr-4">${p.price}</td>
+                      <td className="py-2 pr-4">{p.stockQuantity}</td>
+                      <td className="py-2 pr-4">{p.category?.name || "N/A"}</td>
                       <td className="py-2 pr-4">
-                        {p.stockQuantity ?? p.stock}
-                      </td>
-                      <td className="py-2 pr-4 flex items-center gap-1">
-                        {p.isFeatured ? (
-                          <Star className="h-4 w-4 text-yellow-500" />
-                        ) : (
-                          "No"
-                        )}
+                        {(p as any).isActive ? "Yes" : "No"}
                       </td>
                       <td className="py-2 pr-4 space-x-2">
                         <Link href={`/admin/products/${p.id}/edit`}>
@@ -143,8 +151,8 @@ export default function AdminProductsPage() {
                         <Button
                           size="sm"
                           variant="destructive"
-                          className="cursor-pointer"
                           onClick={() => handleDelete(p.id)}
+                          className="cursor-pointer"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -159,9 +167,16 @@ export default function AdminProductsPage() {
       </Card>
       <ConfirmDialog
         open={!!confirmId}
-        title="Delete product?"
-        description="This will permanently remove the product."
+        title="Delete Product"
+        description="Are you sure you want to delete this product? This will permanently remove the product and all its data."
+        itemDescription={
+          selectedProduct
+            ? `Product: ${selectedProduct.name} - $${selectedProduct.price}`
+            : ""
+        }
         confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
         onConfirm={onConfirmDelete}
         onCancel={() => setConfirmId(null)}
         loading={confirmLoading}

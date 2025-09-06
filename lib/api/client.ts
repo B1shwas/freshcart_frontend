@@ -4,3 +4,4 @@ export { UserApi } from "./users";
 export { CategoryApi } from "./categories";
 export { ProductApi } from "./products";
 export { UserProfileApi } from "./userProfile";
+export { AddressApi } from "./address";

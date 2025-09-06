@@ -7,9 +7,11 @@ type ConfirmDialogProps = {
   open: boolean;
   title?: string;
   description?: string;
+  itemDescription?: string; // Optional item preview
   confirmText?: string;
   cancelText?: string;
   loading?: boolean;
+  variant?: "default" | "destructive";
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -18,32 +20,39 @@ export function ConfirmDialog({
   open,
   title = "Are you sure?",
   description = "This action cannot be undone.",
+  itemDescription,
   confirmText = "Confirm",
   cancelText = "Cancel",
   loading = false,
+  variant = "default",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   if (!open) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative z-10 w-full max-w-sm rounded-md border bg-background p-4 shadow-lg">
-        <h2 className="text-base font-semibold mb-1">{title}</h2>
-        <p className="text-sm text-muted-foreground mb-4">{description}</p>
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            className="cursor-pointer"
-            onClick={onCancel}
-            disabled={loading}
-          >
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 className="text-lg font-semibold mb-2">{title}</h3>
+        <p className="text-gray-600 mb-4">{description}</p>
+
+        {itemDescription && (
+          <div className="bg-gray-50 p-3 rounded-md mb-4">
+            <p className="text-sm text-gray-700">{itemDescription}</p>
+          </div>
+        )}
+
+        <div className="flex gap-3 justify-end">
+          <Button variant="outline" onClick={onCancel} disabled={loading}>
             {cancelText}
           </Button>
           <Button
-            className="cursor-pointer"
+            variant={variant === "destructive" ? "destructive" : "default"}
             onClick={onConfirm}
             disabled={loading}
+            className={
+              variant === "destructive" ? "bg-red-600 hover:bg-red-700" : ""
+            }
           >
             {loading ? "Working..." : confirmText}
           </Button>
