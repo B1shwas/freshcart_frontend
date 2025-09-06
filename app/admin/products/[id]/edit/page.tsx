@@ -123,6 +123,12 @@ export default function EditProductPage() {
         ? Array.from(values.gallery)
         : [];
       if (galleryToUpload.length) {
+        // Clear existing gallery first so backend replaces instead of appends
+        try {
+          await ProductApi.update(token, id, { imageUrls: [] } as any);
+        } catch {
+          // if clearing fails, continue; backend may still overwrite
+        }
         await ProductApi.uploadImages(token, id, galleryToUpload, {
           isThumbnail: false,
         });

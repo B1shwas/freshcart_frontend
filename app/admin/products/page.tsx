@@ -74,11 +74,18 @@ export default function AdminProductsPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Package className="h-6 w-6 text-primary" /> Products
         </h1>
-        <Link href="/admin/products/create">
-          <Button className="cursor-pointer">
-            <Plus className="h-4 w-4 mr-2" /> New Product
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/admin">
+            <Button variant="outline" className="cursor-pointer">
+              Dashboard
+            </Button>
+          </Link>
+          <Link href="/admin/products/create">
+            <Button className="cursor-pointer">
+              <Plus className="h-4 w-4 mr-2" /> New Product
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {error && (
