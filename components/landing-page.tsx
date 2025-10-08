@@ -1,64 +1,107 @@
 "use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Truck, Shield, Clock, Leaf, Star, ArrowRight } from "lucide-react";
+import {
+  Truck,
+  Shield,
+  Clock,
+  Leaf,
+  Star,
+  ArrowRight,
+  ShoppingCart,
+} from "lucide-react";
+import { ProductApi, CategoryApi } from "@/lib/api/client";
 
-// Mock data - these will come from your backend later
-const featuredProducts = [
-  {
-    id: "1",
-    name: "Organic Bananas",
-    price: 2.99,
-    originalPrice: 3.99,
-    image: "/api/placeholder/300/300",
-    discount: 25,
-    rating: 4.8,
-    unit: "per lb",
-  },
-  {
-    id: "2",
-    name: "Fresh Strawberries",
-    price: 5.99,
-    originalPrice: 7.99,
-    image: "/api/placeholder/300/300",
-    discount: 25,
-    rating: 4.9,
-    unit: "per pack",
-  },
-  {
-    id: "3",
-    name: "Organic Spinach",
-    price: 3.49,
-    image: "/api/placeholder/300/300",
-    rating: 4.7,
-    unit: "per bunch",
-  },
-  {
-    id: "4",
-    name: "Fresh Avocados",
-    price: 1.99,
-    image: "/api/placeholder/300/300",
-    rating: 4.6,
-    unit: "each",
-  },
-];
+// Types for the data from backend
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  discountedPrice?: number;
+  discountPercentage?: number;
+  imageUrls?: string[];
+  thumbnailUrl?: string;
+  unit: string;
+  stockQuantity: number;
+  isFeatured: boolean;
+  category?: {
+    id: string;
+    name: string;
+  };
+};
 
-const categories = [
-  { id: "1", name: "Fruits", image: "/api/placeholder/200/200", count: 45 },
-  { id: "2", name: "Vegetables", image: "/api/placeholder/200/200", count: 62 },
-  { id: "3", name: "Dairy", image: "/api/placeholder/200/200", count: 28 },
-  {
-    id: "4",
-    name: "Meat & Fish",
-    image: "/api/placeholder/200/200",
-    count: 34,
-  },
-  { id: "5", name: "Bakery", image: "/api/placeholder/200/200", count: 19 },
-  { id: "6", name: "Beverages", image: "/api/placeholder/200/200", count: 41 },
-];
+type Category = {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  productCount?: number;
+};
+
+// Helper functions to get display values
+const getProductImage = (product: Product): string => {
+  return (
+    product.thumbnailUrl || product.imageUrls?.[0] || "/api/placeholder/300/300"
+  );
+};
+
+const getCategoryImage = (category: Category): string => {
+  return category.imageUrl || "/api/placeholder/200/200";
+};
+
+const getDiscountPercentage = (product: Product): number | null => {
+  if (product.discountedPrice && product.price > product.discountedPrice) {
+    return Math.round(
+      ((product.price - product.discountedPrice) / product.price) * 100
+    );
+  }
+  return product.discountPercentage || null;
+};
+
+const getDisplayPrice = (product: Product): number => {
+  return product.discountedPrice || product.price;
+};
+
+const getOriginalPrice = (product: Product): number | null => {
+  return product.discountedPrice ? product.price : null;
+};
 
 export function LandingPage() {
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch featured products and categories in parallel
+        const [productsData, categoriesData] = await Promise.all([
+          ProductApi.featuredAll(),
+          CategoryApi.list(),
+        ]);
+
+        setFeaturedProducts(
+          Array.isArray(productsData) ? productsData.slice(0, 4) : []
+        );
+        setCategories(
+          Array.isArray(categoriesData) ? categoriesData.slice(0, 6) : []
+        );
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        // Keep empty arrays on error - component will show empty state
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -75,10 +118,12 @@ export function LandingPage() {
                 your doorstep. Quality guaranteed, always fresh.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" className="text-lg px-8 py-4">
-                  Shop Now
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
+                <Link href="/products">
+                  <Button size="lg" className="text-lg px-8 py-4">
+                    Shop Now
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
                 <Button
                   variant="outline"
                   size="lg"
@@ -139,30 +184,51 @@ export function LandingPage() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {categories.map((category) => (
-              <Card
-                key={category.id}
-                className="group cursor-pointer hover:shadow-lg transition-shadow duration-300"
-              >
-                <CardContent className="p-6 text-center">
-                  <div className="relative mb-4">
-                    <Image
-                      src={category.image}
-                      alt={category.name}
-                      width={80}
-                      height={80}
-                      className="mx-auto rounded-full group-hover:scale-110 transition-transform duration-300"
-                    />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-1">
-                    {category.name}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {category.count} items
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+            {loading ? (
+              // Loading skeleton
+              Array.from({ length: 6 }).map((_, index) => (
+                <Card key={index} className="animate-pulse">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-4"></div>
+                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded"></div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : categories.length > 0 ? (
+              categories.map((category) => (
+                <Link
+                  key={category.id}
+                  href={`/products?category=${category.id}`}
+                >
+                  <Card className="group cursor-pointer hover:shadow-lg transition-shadow duration-300">
+                    <CardContent className="p-6 text-center">
+                      <div className="relative mb-4">
+                        <Image
+                          src={`http://localhost:3001${getCategoryImage(
+                            category
+                          )}`}
+                          alt={category.imageUrl || "fie"}
+                          width={80}
+                          height={80}
+                          className="mx-auto rounded-full !h-20 w-20 object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-1">
+                        {category.name}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        {category.productCount || 0} items
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">No categories available</p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -179,69 +245,102 @@ export function LandingPage() {
                 Hand-picked favorites from our fresh collection
               </p>
             </div>
-            <Button variant="outline">
-              View All Products
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <Link href="/products">
+              <Button variant="outline">
+                View All Products
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product) => (
-              <Card
-                key={product.id}
-                className="group cursor-pointer hover:shadow-lg transition-shadow duration-300"
-              >
-                <CardContent className="p-0">
-                  <div className="relative">
-                    <Image
-                      src={product.image}
-                      alt={product.name}
-                      width={300}
-                      height={300}
-                      className="w-full h-48 object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-300"
-                    />
-                    {product.discount && (
-                      <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-xs font-semibold">
-                        -{product.discount}%
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2">
-                      {product.name}
-                    </h3>
-
-                    <div className="flex items-center mb-2">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm text-gray-600 ml-1">
-                        {product.rating}
-                      </span>
+            {loading ? (
+              // Loading skeleton for products
+              Array.from({ length: 4 }).map((_, index) => (
+                <Card key={index} className="animate-pulse">
+                  <CardContent className="p-0">
+                    <div className="w-full h-48 bg-gray-200 rounded-t-lg"></div>
+                    <div className="p-4">
+                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-4 bg-gray-200 rounded mb-3"></div>
+                      <div className="h-8 bg-gray-200 rounded"></div>
                     </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : featuredProducts.length > 0 ? (
+              featuredProducts.map((product) => {
+                const discount = getDiscountPercentage(product);
+                const displayPrice = getDisplayPrice(product);
+                const originalPrice = getOriginalPrice(product);
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-bold text-lg text-primary">
-                          ${product.price}
-                        </span>
-                        {product.originalPrice && (
-                          <span className="text-sm text-gray-500 line-through">
-                            ${product.originalPrice}
+                return (
+                  <Card
+                    key={product.id}
+                    className="group cursor-pointer hover:shadow-lg transition-shadow duration-300"
+                  >
+                    <CardContent className="p-0">
+                      <div className="relative">
+                        <Image
+                          src={`http://localhost:3001${getProductImage(
+                            product
+                          )}`}
+                          alt={product.name}
+                          width={300}
+                          height={300}
+                          className="w-full h-48 object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-300"
+                        />
+                        {discount && (
+                          <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-xs font-semibold">
+                            -{discount}%
                           </span>
                         )}
-                        <span className="text-xs text-gray-500">
-                          {product.unit}
-                        </span>
                       </div>
-                    </div>
 
-                    <Button className="w-full mt-3" size="sm">
-                      Add to Cart
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      <div className="p-4">
+                        <h3 className="font-semibold text-gray-900 mb-2">
+                          {product.name}
+                        </h3>
+
+                        {/* Since we don't have rating in backend yet, show placeholder */}
+                        <div className="flex items-center mb-2">
+                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          <span className="text-sm text-gray-600 ml-1">
+                            4.5
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-bold text-lg text-primary">
+                              ${displayPrice}
+                            </span>
+                            {originalPrice && (
+                              <span className="text-sm text-gray-500 line-through">
+                                ${originalPrice}
+                              </span>
+                            )}
+                            <span className="text-xs text-gray-500">
+                              {product.unit}
+                            </span>
+                          </div>
+                        </div>
+
+                        <Button className="w-full mt-3" size="sm">
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          Add to Cart
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            ) : (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">No featured products available</p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -322,9 +421,15 @@ export function LandingPage() {
             daily grocery needs
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="secondary" className="text-lg px-8 py-4">
-              Start Shopping Now
-            </Button>
+            <Link href="/products">
+              <Button
+                size="lg"
+                variant="secondary"
+                className="text-lg px-8 py-4"
+              >
+                Start Shopping Now
+              </Button>
+            </Link>
             <Button
               size="lg"
               variant="outline"

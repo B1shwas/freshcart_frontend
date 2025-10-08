@@ -1,13 +1,10 @@
-import { Header } from "@/components/header";
 import { LandingPage } from "@/components/landing-page";
-import { Footer } from "@/components/footer";
+import { MainLayout } from "@/components/main-layout";
 
 export default function Home() {
   return (
-    <div className="min-h-screen">
-      <Header />
+    <MainLayout>
       <LandingPage />
-      <Footer />
-    </div>
+    </MainLayout>
   );
 }

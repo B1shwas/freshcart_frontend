@@ -1,13 +1,18 @@
 import { http, unwrap, type ApiEnvelope } from "./http";
 
 export const CategoryApi = {
-  list: async (token: string, params?: Record<string, unknown>) => {
-    const res = await http.get<ApiEnvelope<unknown>>("/categories", {
-      headers: { Authorization: `Bearer ${token}` },
-      params,
-    });
+  // Public route - get all categories
+  list: async (params?: Record<string, unknown>) => {
+    const res = await http.get<ApiEnvelope<unknown>>("/categories", { params });
     return unwrap<unknown>(res.data);
   },
+
+  // Public route - get root categories
+  getRootCategories: async () => {
+    const res = await http.get<ApiEnvelope<unknown>>("/categories/root/all");
+    return unwrap<unknown>(res.data);
+  },
+
   get: async (token: string, id: string) => {
     const res = await http.get<ApiEnvelope<unknown>>(`/categories/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
