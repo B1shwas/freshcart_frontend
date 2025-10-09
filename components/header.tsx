@@ -38,12 +38,6 @@ export function Header() {
               >
                 Categories
               </Link>
-              <Link
-                href="/deals"
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-              >
-                Deals
-              </Link>
             </nav>
           </div>
 

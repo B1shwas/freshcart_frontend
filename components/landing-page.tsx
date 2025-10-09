@@ -201,7 +201,7 @@ export function LandingPage() {
                   key={category.id}
                   href={`/products?category=${category.id}`}
                 >
-                  <Card className="group cursor-pointer hover:shadow-lg transition-shadow duration-300">
+                  <Card className="group cursor-pointer hover:shadow-lg transition-shadow duration-300 h-55">
                     <CardContent className="p-6 text-center">
                       <div className="relative mb-4">
                         <Image

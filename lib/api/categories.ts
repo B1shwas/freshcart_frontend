@@ -13,6 +13,14 @@ export const CategoryApi = {
     return unwrap<unknown>(res.data);
   },
 
+  // Public route - get subcategories
+  getSubcategories: async (id: string) => {
+    const res = await http.get<ApiEnvelope<unknown>>(
+      `/categories/${id}/subcategories`
+    );
+    return unwrap<unknown>(res.data);
+  },
+
   get: async (token: string, id: string) => {
     const res = await http.get<ApiEnvelope<unknown>>(`/categories/${id}`, {
       headers: { Authorization: `Bearer ${token}` },

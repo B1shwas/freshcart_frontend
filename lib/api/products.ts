@@ -1,5 +1,23 @@
 import { http, unwrap, type ApiEnvelope } from "./http";
 
+export type ProductListParams = {
+  categoryId?: string;
+  isFeatured?: boolean;
+  search?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  limit?: number;
+  offset?: number;
+};
+
+export type FeaturedProductsParams = {
+  limit?: number;
+};
+
+export type RelatedProductsParams = {
+  limit?: number;
+};
+
 export type Unit = "kg" | "g" | "l" | "ml" | "pc" | "dozen" | "pack" | "bundle";
 
 export type ProductPayload = {
@@ -25,7 +43,7 @@ export const ProductApi = {
     });
     return unwrap<unknown>(res.data);
   },
-  list: async (params?: Record<string, unknown>) => {
+  list: async (params?: ProductListParams) => {
     const res = await http.get<ApiEnvelope<unknown>>("/products", { params });
     return unwrap<unknown>(res.data);
   },
@@ -53,12 +71,17 @@ export const ProductApi = {
     });
     return unwrap<unknown>(res.data);
   },
-  featuredAll: async () => {
-    const res = await http.get<ApiEnvelope<unknown>>("/products/featured/all");
+  featuredAll: async (params?: FeaturedProductsParams) => {
+    const res = await http.get<ApiEnvelope<unknown>>("/products/featured/all", {
+      params,
+    });
     return unwrap<unknown>(res.data);
   },
-  related: async (id: string) => {
-    const res = await http.get<ApiEnvelope<unknown>>(`/products/${id}/related`);
+  related: async (id: string, params?: RelatedProductsParams) => {
+    const res = await http.get<ApiEnvelope<unknown>>(
+      `/products/${id}/related`,
+      { params }
+    );
     return unwrap<unknown>(res.data);
   },
   updateStock: async (token: string, id: string, stockQuantity: number) => {

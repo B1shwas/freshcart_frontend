@@ -32,11 +32,11 @@ export default function AdminCategoriesPage() {
   }, [isAuthenticated, isAdmin, router]);
 
   const load = async () => {
-    if (!token) return;
     setLoading(true);
     setError(null);
     try {
-      const data = (await CategoryApi.list(token)) as any;
+      // Use the public list method since categories are publicly available
+      const data = (await CategoryApi.list()) as any;
       const items: Category[] = Array.isArray(data)
         ? data
         : Array.isArray(data?.items)
@@ -44,6 +44,7 @@ export default function AdminCategoriesPage() {
         : [];
       setCategories(items);
     } catch (e) {
+      console.error("Error loading categories:", e);
       setError(e instanceof Error ? e.message : "Failed to load categories");
     } finally {
       setLoading(false);
@@ -51,9 +52,10 @@ export default function AdminCategoriesPage() {
   };
 
   useEffect(() => {
+    // Load categories regardless of token since it's a public endpoint
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, []);
 
   const handleDelete = (id: string) => setConfirmId(id);
   const onConfirmDelete = async () => {
@@ -102,61 +104,90 @@ export default function AdminCategoriesPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">All Categories</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : sorted.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No categories found.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="py-2 pr-4">Name</th>
-                    <th className="py-2 pr-4">Active</th>
-                    <th className="py-2 pr-4">Sort</th>
-                    <th className="py-2 pr-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map((c) => (
-                    <tr key={c.id} className="border-b">
-                      <td className="py-2 pr-4 font-medium">{c.name}</td>
-                      <td className="py-2 pr-4">{c.isActive ? "Yes" : "No"}</td>
-                      <td className="py-2 pr-4">{c.sortOrder ?? 0}</td>
-                      <td className="py-2 pr-4 space-x-2">
-                        <Link href={`/admin/categories/${c.id}/edit`}>
+      <div className="space-y-6">
+        {loading ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Loading categories...</p>
+          </div>
+        ) : sorted.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground mb-4">No categories found.</p>
+            <Link href="/admin/categories/create">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" /> Create your first category
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">All Categories</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left border-b">
+                      <th className="py-2 pr-4">Name</th>
+                      <th className="py-2 pr-4">Description</th>
+                      <th className="py-2 pr-4">Active</th>
+                      <th className="py-2 pr-4">Sort</th>
+                      <th className="py-2 pr-4">Created</th>
+                      <th className="py-2 pr-4">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map((c) => (
+                      <tr key={c.id} className="border-b hover:bg-gray-50">
+                        <td className="py-2 pr-4 font-medium">{c.name}</td>
+                        <td className="py-2 pr-4 max-w-xs truncate">
+                          {c.description || "-"}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <span
+                            className={`px-2 py-1 rounded text-xs ${
+                              c.isActive
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {c.isActive ? "Yes" : "No"}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-4">{c.sortOrder ?? 0}</td>
+                        <td className="py-2 pr-4">
+                          {c.createdAt
+                            ? new Date(c.createdAt).toLocaleDateString()
+                            : "-"}
+                        </td>
+                        <td className="py-2 pr-4 space-x-2">
+                          <Link href={`/admin/categories/${c.id}/edit`}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="cursor-pointer"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </Link>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="destructive"
+                            onClick={() => handleDelete(c.id)}
                             className="cursor-pointer"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        </Link>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(c.id)}
-                          className="cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
       <ConfirmDialog
         open={!!confirmId}
         title="Delete Category"

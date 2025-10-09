@@ -46,27 +46,25 @@ export default function CreateProductPage() {
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
 
   useEffect(() => {
-    if (!token) return;
     let cancelled = false;
     const loadCats = async () => {
       setLoadingCats(true);
       setCatsError(null);
       try {
-        const data = (await CategoryApi.list(token, {
-          limit: 1000,
-          isActive: true,
-        })) as any;
+        // Use public API to get categories for selection
+        const data = (await CategoryApi.list()) as any;
         const items: Category[] = Array.isArray(data)
           ? data
           : Array.isArray(data?.items)
           ? data.items
           : [];
-        if (!cancelled) setCategories(items);
+        // Filter for active categories only
+        const activeCategories = items.filter((cat) => cat.isActive !== false);
+        if (!cancelled) setCategories(activeCategories);
       } catch (e) {
+        console.error("Error loading categories for product creation:", e);
         if (!cancelled)
-          setCatsError(
-            e instanceof Error ? e.message : "Failed to load categories"
-          );
+          setCatsError("Failed to load categories. Please try again.");
       } finally {
         if (!cancelled) setLoadingCats(false);
       }
@@ -75,7 +73,7 @@ export default function CreateProductPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, []);
 
   const onSubmit = async (values: FormValues) => {
     let createdProductId: string | null = null;

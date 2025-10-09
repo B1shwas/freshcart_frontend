@@ -67,28 +67,58 @@ export default function EditCategoryPage() {
 
   useEffect(() => {
     const loadCats = async () => {
-      if (!token) return;
       setLoadingCats(true);
       try {
-        const data = (await CategoryApi.list(token)) as any;
+        // Use public API to get categories for parent selection
+        const data = (await CategoryApi.list()) as any;
         const items: Category[] = Array.isArray(data)
           ? data
           : Array.isArray(data?.items)
           ? data.items
           : [];
+        // Filter out the current category to prevent circular parent relationships
         setCategories(items.filter((c) => c.id !== id));
       } catch (e) {
+        console.error("Error loading categories for parent selection:", e);
         // ignore non-blocking
       } finally {
         setLoadingCats(false);
       }
     };
     loadCats();
-  }, [token, id]);
+  }, [id]);
 
   const onSubmit = async (values: FormValues) => {
+    let originalCategoryData: any = null;
+
     try {
       if (!token || !id) throw new Error("Not authenticated");
+
+      const file = values.imageFile?.[0];
+
+      // If no image file, just update the category normally
+      if (!file) {
+        await CategoryApi.update(token, id, {
+          name: values.name,
+          description: values.description || undefined,
+          isActive: values.isActive ?? true,
+          parentId: values.parentId || undefined,
+        });
+
+        router.push("/admin/categories");
+        return;
+      }
+
+      // If image file exists, get original data first for potential rollback
+      try {
+        originalCategoryData = (await CategoryApi.get(token, id)) as any;
+      } catch (getError) {
+        throw new Error(
+          "Something went wrong while accessing the category. Please try again."
+        );
+      }
+
+      // Update category first
       await CategoryApi.update(token, id, {
         name: values.name,
         description: values.description || undefined,
@@ -96,22 +126,63 @@ export default function EditCategoryPage() {
         parentId: values.parentId || undefined,
       });
 
-      const file = values.imageFile?.[0];
-      if (file) {
+      // Try to upload image - if this fails, we'll rollback
+      try {
         const uploadRes = (await CategoryApi.uploadImage(
           token,
           id,
           file
         )) as any;
+
         const imageUrl =
           uploadRes?.url || uploadRes?.imageUrl || uploadRes?.data?.url;
-        // if (imageUrl) {
-        //   await CategoryApi.update(token, id, { image: imageUrl });
-        // }
+
+        if (!imageUrl) {
+          throw new Error("Image upload failed");
+        }
+
+        // Success - redirect
+        router.push("/admin/categories");
+      } catch (imageError) {
+        // Image upload failed - rollback the category update
+        console.error(
+          "Image upload failed, rolling back category update:",
+          imageError
+        );
+
+        try {
+          await CategoryApi.update(token, id, {
+            name: originalCategoryData.name,
+            description: originalCategoryData.description,
+            isActive: originalCategoryData.isActive,
+            parentId: originalCategoryData.parentId,
+          });
+        } catch (rollbackError) {
+          console.error("Failed to rollback category update:", rollbackError);
+        }
+
+        throw new Error(
+          "Something went wrong while uploading the image. Please try again."
+        );
       }
-      router.push("/admin/categories");
     } catch (e) {
-      setError("root", { message: e instanceof Error ? e.message : "Failed" });
+      console.error("Category update error:", e);
+
+      // Set user-friendly error message
+      let errorMessage =
+        "Something went wrong while updating the category. Please try again.";
+
+      if (e instanceof Error) {
+        // Only show specific errors for authentication or validation issues
+        if (
+          e.message.includes("Not authenticated") ||
+          e.message.includes("required")
+        ) {
+          errorMessage = e.message;
+        }
+      }
+
+      setError("root", { message: errorMessage });
     }
   };
 

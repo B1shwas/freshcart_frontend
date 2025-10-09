@@ -42,10 +42,10 @@ export default function CreateCategoryPage() {
 
   useEffect(() => {
     const loadCats = async () => {
-      if (!token) return;
       setLoadingCats(true);
       try {
-        const data = (await CategoryApi.list(token)) as any;
+        // Use public API to get categories for parent selection
+        const data = (await CategoryApi.list()) as any;
         const items: Category[] = Array.isArray(data)
           ? data
           : Array.isArray(data?.items)
@@ -53,18 +53,38 @@ export default function CreateCategoryPage() {
           : [];
         setCategories(items);
       } catch (e) {
+        console.error("Error loading categories for parent selection:", e);
         // non-blocking; ignore
       } finally {
         setLoadingCats(false);
       }
     };
     loadCats();
-  }, [token]);
+  }, []);
 
   const onSubmit = async (values: FormValues) => {
+    let createdCategoryId: string | null = null;
+
     try {
       if (!token) throw new Error("Not authenticated");
-      // 1) Create category without image first
+
+      const file = values.imageFile?.[0];
+
+      // If no image file, just create the category normally
+      if (!file) {
+        const created = (await CategoryApi.create(token, {
+          name: values.name,
+          description: values.description || undefined,
+          parentId: values.parentId || undefined,
+          isActive: values.isActive ?? true,
+        })) as any;
+
+        router.push("/admin/categories");
+        return;
+      }
+
+      // If image file exists, use transaction-like approach
+      // 1) Create category first
       const created = (await CategoryApi.create(token, {
         name: values.name,
         description: values.description || undefined,
@@ -72,37 +92,71 @@ export default function CreateCategoryPage() {
         isActive: values.isActive ?? true,
       })) as any;
 
-      const categoryId = created?.id || created?._id || created?.category?.id;
-      if (!categoryId) {
-        // If API returns envelope with data, try data.id
-        const fallbackId = created?.data?.id || created?.data?._id;
-        if (!fallbackId)
-          throw new Error("Category created but id not found in response");
+      createdCategoryId =
+        created?.id ||
+        created?._id ||
+        created?.category?.id ||
+        created?.data?.id ||
+        created?.data?._id;
+
+      if (!createdCategoryId) {
+        throw new Error(
+          "Something went wrong while creating the category. Please try again."
+        );
       }
 
-      let imageUrl: string | undefined = undefined;
-      const file = values.imageFile?.[0];
-      if (file) {
-        // 2) Upload image and get URL from response
+      // 2) Try to upload image - if this fails, we'll rollback
+      try {
         const uploadRes = (await CategoryApi.uploadImage(
           token,
-          categoryId || created?.data?.id,
+          createdCategoryId,
           file
         )) as any;
-        imageUrl =
+
+        const imageUrl =
           uploadRes?.url || uploadRes?.imageUrl || uploadRes?.data?.url;
+
+        if (!imageUrl) {
+          throw new Error("Image upload failed");
+        }
+
+        // Success - redirect
+        router.push("/admin/categories");
+      } catch (imageError) {
+        // Image upload failed - rollback by deleting the created category
+        console.error(
+          "Image upload failed, rolling back category creation:",
+          imageError
+        );
+
+        try {
+          await CategoryApi.remove(token, createdCategoryId);
+        } catch (rollbackError) {
+          console.error("Failed to rollback category creation:", rollbackError);
+        }
+
+        throw new Error(
+          "Something went wrong while uploading the image. Please try again."
+        );
+      }
+    } catch (e) {
+      console.error("Category creation error:", e);
+
+      // Set user-friendly error message
+      let errorMessage =
+        "Something went wrong while creating the category. Please try again.";
+
+      if (e instanceof Error) {
+        // Only show specific errors for authentication or validation issues
+        if (
+          e.message.includes("Not authenticated") ||
+          e.message.includes("required")
+        ) {
+          errorMessage = e.message;
+        }
       }
 
-      // if (imageUrl) {
-      //   // 3) Update category with uploaded image URL
-      //   await CategoryApi.update(token, categoryId || created?.data?.id, {
-      //     image: imageUrl,
-      //   });
-      // }
-
-      router.push("/admin/categories");
-    } catch (e) {
-      setError("root", { message: e instanceof Error ? e.message : "Failed" });
+      setError("root", { message: errorMessage });
     }
   };
 

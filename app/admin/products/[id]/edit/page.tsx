@@ -52,23 +52,24 @@ export default function EditProductPage() {
 
   useEffect(() => {
     const loadCats = async () => {
-      if (!token) return;
       setLoadingCats(true);
       try {
-        const data = (await CategoryApi.list(token)) as any;
+        // Use public API to get categories for selection
+        const data = (await CategoryApi.list()) as any;
         const items: Category[] = Array.isArray(data)
           ? data
           : Array.isArray(data?.items)
           ? data.items
           : [];
         setCategories(items);
-      } catch {
+      } catch (e) {
+        console.error("Error loading categories for product editing:", e);
       } finally {
         setLoadingCats(false);
       }
     };
     loadCats();
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     const load = async () => {

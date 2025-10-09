@@ -55,14 +55,6 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/deals"
-                  className="hover:text-primary transition-colors"
-                >
-                  Special Deals
-                </Link>
-              </li>
-              <li>
-                <Link
                   href="/organic"
                   className="hover:text-primary transition-colors"
                 >

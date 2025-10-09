@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
 import {
   Search,
   Filter,
@@ -10,144 +12,54 @@ import {
   Star,
   ShoppingCart,
   Heart,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { MainLayout } from "@/components/main-layout";
+import { ProductApi, type ProductListParams } from "@/lib/api/products";
+import { CategoryApi } from "@/lib/api/categories";
 
-// Static data for now
-const STATIC_CATEGORIES = [
-  { id: "1", name: "All Products", count: 24 },
-  { id: "2", name: "Fruits & Vegetables", count: 8 },
-  { id: "3", name: "Dairy & Eggs", count: 6 },
-  { id: "4", name: "Meat & Seafood", count: 4 },
-  { id: "5", name: "Bakery", count: 3 },
-  { id: "6", name: "Beverages", count: 3 },
-];
+// Product types based on backend response
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: string; // Backend returns as string
+  discountedPrice?: string;
+  discountPercentage?: string;
+  imageUrls: string[];
+  thumbnailUrl?: string;
+  categoryId: string;
+  stockQuantity: number;
+  unit: string;
+  isFeatured: boolean;
+  averageRating: number;
+  reviewCount: number;
+  isActive: boolean;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  category?: {
+    id: string;
+    name: string;
+  };
+}
 
-const STATIC_PRODUCTS = [
-  {
-    id: "1",
-    name: "Fresh Organic Apples",
-    price: 4.99,
-    originalPrice: 6.99,
-    image: "/api/placeholder/300/300",
-    category: "Fruits & Vegetables",
-    rating: 4.5,
-    reviews: 124,
-    inStock: true,
-    stockQuantity: 50,
-    isFeatured: true,
-    isOnSale: true,
-    description: "Premium organic apples, crisp and sweet",
-  },
-  {
-    id: "2",
-    name: "Whole Milk 1L",
-    price: 3.49,
-    originalPrice: null,
-    image: "/api/placeholder/300/300",
-    category: "Dairy & Eggs",
-    rating: 4.8,
-    reviews: 89,
-    inStock: true,
-    stockQuantity: 30,
-    isFeatured: false,
-    isOnSale: false,
-    description: "Fresh whole milk from local farms",
-  },
-  {
-    id: "3",
-    name: "Atlantic Salmon Fillet",
-    price: 12.99,
-    originalPrice: 15.99,
-    image: "/api/placeholder/300/300",
-    category: "Meat & Seafood",
-    rating: 4.7,
-    reviews: 67,
-    inStock: true,
-    stockQuantity: 15,
-    isFeatured: true,
-    isOnSale: true,
-    description: "Fresh Atlantic salmon, perfect for grilling",
-  },
-  {
-    id: "4",
-    name: "Artisan Sourdough Bread",
-    price: 5.99,
-    originalPrice: null,
-    image: "/api/placeholder/300/300",
-    category: "Bakery",
-    rating: 4.6,
-    reviews: 43,
-    inStock: true,
-    stockQuantity: 20,
-    isFeatured: false,
-    isOnSale: false,
-    description: "Handcrafted sourdough bread, baked daily",
-  },
-  {
-    id: "5",
-    name: "Orange Juice 1L",
-    price: 4.49,
-    originalPrice: null,
-    image: "/api/placeholder/300/300",
-    category: "Beverages",
-    rating: 4.3,
-    reviews: 156,
-    inStock: true,
-    stockQuantity: 40,
-    isFeatured: false,
-    isOnSale: false,
-    description: "100% pure orange juice, no added sugar",
-  },
-  {
-    id: "6",
-    name: "Free Range Eggs (12 pack)",
-    price: 6.99,
-    originalPrice: 8.99,
-    image: "/api/placeholder/300/300",
-    category: "Dairy & Eggs",
-    rating: 4.9,
-    reviews: 201,
-    inStock: true,
-    stockQuantity: 25,
-    isFeatured: true,
-    isOnSale: true,
-    description: "Farm fresh free-range eggs from happy hens",
-  },
-  {
-    id: "7",
-    name: "Organic Bananas",
-    price: 2.99,
-    originalPrice: null,
-    image: "/api/placeholder/300/300",
-    category: "Fruits & Vegetables",
-    rating: 4.4,
-    reviews: 78,
-    inStock: false,
-    stockQuantity: 0,
-    isFeatured: false,
-    isOnSale: false,
-    description: "Sweet organic bananas, perfect for smoothies",
-  },
-  {
-    id: "8",
-    name: "Grass-Fed Ground Beef",
-    price: 8.99,
-    originalPrice: null,
-    image: "/api/placeholder/300/300",
-    category: "Meat & Seafood",
-    rating: 4.8,
-    reviews: 92,
-    inStock: true,
-    stockQuantity: 18,
-    isFeatured: false,
-    isOnSale: false,
-    description: "Premium grass-fed ground beef, 80/20 lean",
-  },
-];
+interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  parentId?: string;
+  productCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const BASE_URL = "http://localhost:3001";
 
 const SORT_OPTIONS = [
   { value: "featured", label: "Featured" },
@@ -162,15 +74,28 @@ export default function ProductsPage() {
   const searchParams = useSearchParams();
   const categoryFromUrl = searchParams.get("category");
 
+  // State
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(
-    categoryFromUrl || "1"
-  ); // "All Products" or from URL
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    categoryFromUrl || "all"
+  );
   const [sortBy, setSortBy] = useState("featured");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [priceRange, setPriceRange] = useState({ min: 0, max: 50 });
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
   const [showOnlyInStock, setShowOnlyInStock] = useState(false);
   const [showOnlyOnSale, setShowOnlyOnSale] = useState(false);
+
+  // API Data
+  const [products, setProducts] = useState<Product[]>([]);
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalProducts, setTotalProducts] = useState(0);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   // Update selected category when URL parameter changes
   useEffect(() => {
@@ -179,231 +104,399 @@ export default function ProductsPage() {
     }
   }, [categoryFromUrl]);
 
-  // Filter and sort products
-  const filteredAndSortedProducts = useMemo(() => {
-    let filtered = STATIC_PRODUCTS.filter((product) => {
-      // Search filter
-      if (
-        searchTerm &&
-        !product.name.toLowerCase().includes(searchTerm.toLowerCase())
-      ) {
-        return false;
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = (await CategoryApi.list()) as Category[];
+        // Ensure response is an array
+        const categoriesArray = Array.isArray(response) ? response : [];
+        setCategories([
+          {
+            id: "all",
+            name: "All Products",
+            description: "",
+            isActive: true,
+            createdAt: "",
+            updatedAt: "",
+            productCount: 0,
+          },
+          ...categoriesArray,
+        ]);
+      } catch (err) {
+        console.error("Error fetching categories:", err);
       }
+    };
 
-      // Category filter
-      if (
-        selectedCategory !== "1" &&
-        product.category !==
-          STATIC_CATEGORIES.find((c) => c.id === selectedCategory)?.name
-      ) {
-        return false;
-      }
+    fetchCategories();
+  }, []);
 
-      // Price range filter
-      if (product.price < priceRange.min || product.price > priceRange.max) {
-        return false;
-      }
+  // Helper function to get all subcategory IDs for a given category
+  const getAllCategoryIds = (
+    categoryId: string,
+    allCategories: Category[]
+  ): string[] => {
+    if (categoryId === "all") return [];
 
-      // Stock filter
-      if (showOnlyInStock && !product.inStock) {
-        return false;
-      }
+    const result = [categoryId];
 
-      // Sale filter
-      if (showOnlyOnSale && !product.isOnSale) {
-        return false;
-      }
+    // Find all direct children
+    const children = allCategories.filter((cat) => cat.parentId === categoryId);
 
-      return true;
+    // Recursively get children of children
+    children.forEach((child) => {
+      result.push(...getAllCategoryIds(child.id, allCategories));
     });
+
+    return result;
+  };
+
+  // Fetch products with current filters
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const params: ProductListParams = {
+          limit: itemsPerPage,
+          offset: (currentPage - 1) * itemsPerPage,
+        };
+
+        // Add filters - include subcategories
+        if (selectedCategory !== "all") {
+          // Get all category IDs including subcategories
+          const categoryIds = getAllCategoryIds(selectedCategory, categories);
+
+          if (categoryIds.length === 1) {
+            // Single category
+            params.categoryId = selectedCategory;
+          } else if (categoryIds.length > 1) {
+            // Multiple categories (parent + children) - we'll need to handle this differently
+            // For now, let's fetch all products and filter client-side
+            // TODO: Backend should support multiple category IDs
+            console.log("Filtering by category IDs:", categoryIds);
+          } else {
+            params.categoryId = selectedCategory;
+          }
+        }
+        if (searchTerm) {
+          params.search = searchTerm;
+        }
+        if (priceRange.min > 0) {
+          params.minPrice = priceRange.min;
+        }
+        if (priceRange.max < 1000) {
+          params.maxPrice = priceRange.max;
+        }
+
+        console.log("Fetching products with params:", params);
+        const response = (await ProductApi.list(params)) as any;
+        console.log("API response:", response);
+
+        // Ensure response is an array - handle different response formats
+        let productsArray = Array.isArray(response)
+          ? response
+          : Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response?.products)
+          ? response.products
+          : [];
+
+        // If we have multiple category IDs (parent + children), filter client-side
+        if (selectedCategory !== "all") {
+          const categoryIds = getAllCategoryIds(selectedCategory, categories);
+          if (categoryIds.length > 1) {
+            // Get all products and filter by category hierarchy
+            const allProductsResponse = (await ProductApi.list({
+              limit: 1000, // Get more products to filter from
+            })) as any;
+            const allProducts = Array.isArray(allProductsResponse)
+              ? allProductsResponse
+              : Array.isArray(allProductsResponse?.data)
+              ? allProductsResponse.data
+              : Array.isArray(allProductsResponse?.products)
+              ? allProductsResponse.products
+              : [];
+
+            // Filter products that belong to any of the category IDs
+            productsArray = allProducts.filter((product: Product) =>
+              categoryIds.includes(product.categoryId)
+            );
+
+            console.log(
+              "Filtered by category hierarchy:",
+              categoryIds,
+              "Found products:",
+              productsArray.length
+            );
+          }
+        }
+
+        console.log("Final products array:", productsArray);
+
+        setProducts(productsArray);
+        setTotalProducts(productsArray.length);
+      } catch (err) {
+        console.error("Error fetching products:", err);
+        setError("Failed to load products. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [
+    selectedCategory,
+    searchTerm,
+    priceRange,
+    currentPage,
+    showOnlyInStock,
+    showOnlyOnSale,
+  ]);
+
+  // Filter and sort products locally (since backend handles most filtering)
+  const filteredAndSortedProducts = useMemo(() => {
+    // Ensure products is always an array
+    if (!Array.isArray(products)) {
+      return [];
+    }
+
+    let filtered = [...products];
+
+    // Additional local filters
+    if (showOnlyInStock) {
+      filtered = filtered.filter((product) => product.stockQuantity > 0);
+    }
+
+    if (showOnlyOnSale) {
+      filtered = filtered.filter(
+        (product) =>
+          product.discountedPrice &&
+          parseFloat(product.discountedPrice) < parseFloat(product.price)
+      );
+    }
 
     // Sort products
     filtered.sort((a, b) => {
       switch (sortBy) {
         case "price-low":
-          return a.price - b.price;
+          return parseFloat(a.price) - parseFloat(b.price);
         case "price-high":
-          return b.price - a.price;
+          return parseFloat(b.price) - parseFloat(a.price);
         case "name":
           return a.name.localeCompare(b.name);
         case "rating":
-          return b.rating - a.rating;
+          return b.averageRating - a.averageRating;
         case "featured":
           return b.isFeatured ? 1 : -1;
+        case "newest":
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
         default:
           return 0;
       }
     });
 
     return filtered;
-  }, [
-    searchTerm,
-    selectedCategory,
-    sortBy,
-    priceRange,
-    showOnlyInStock,
-    showOnlyOnSale,
-  ]);
+  }, [products, sortBy, showOnlyInStock, showOnlyOnSale]);
 
-  const ProductCard = ({
-    product,
-  }: {
-    product: (typeof STATIC_PRODUCTS)[0];
-  }) => (
-    <Card className="group hover:shadow-lg transition-shadow">
-      <CardContent className="p-0">
-        <div className="relative">
-          <img
-            src={product.image}
-            alt={product.name}
-            className="w-full h-48 object-cover rounded-t-lg"
-          />
-          {product.isOnSale && (
-            <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 text-xs rounded">
-              Sale
-            </span>
-          )}
-          {product.isFeatured && (
-            <span className="absolute top-2 right-2 bg-yellow-500 text-white p-1 rounded">
-              <Star className="h-3 w-3" />
-            </span>
-          )}
-          <button className="absolute top-2 right-8 bg-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Heart className="h-4 w-4" />
-          </button>
-        </div>
+  const ProductCard = ({ product }: { product: Product }) => {
+    const price = parseFloat(product.price);
+    const discountedPrice = product.discountedPrice
+      ? parseFloat(product.discountedPrice)
+      : null;
+    const isOnSale = discountedPrice && discountedPrice < price;
+    const inStock = product.stockQuantity > 0;
 
-        <div className="p-4">
-          <h3 className="font-semibold text-lg mb-1 line-clamp-2">
-            {product.name}
-          </h3>
-          <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-            {product.description}
-          </p>
+    const imageUrl = product.thumbnailUrl || product.imageUrls[0];
+    const fullImageUrl = imageUrl
+      ? `${BASE_URL}${imageUrl}`
+      : "/api/placeholder/300/300";
 
-          <div className="flex items-center gap-1 mb-2">
-            <div className="flex">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  className={`h-4 w-4 ${
-                    i < Math.floor(product.rating)
-                      ? "text-yellow-400 fill-current"
-                      : "text-gray-300"
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-sm text-gray-500">({product.reviews})</span>
-          </div>
-
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-green-600">
-                ${product.price}
+    return (
+      <Card className="group hover:shadow-lg transition-shadow">
+        <CardContent className="p-0">
+          <div className="relative">
+            <Link href={`/products/${product.id}`}>
+              <Image
+                src={fullImageUrl}
+                alt={product.name}
+                width={300}
+                height={200}
+                className="w-full h-48 object-cover rounded-t-lg"
+              />
+            </Link>
+            {isOnSale && (
+              <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 text-xs rounded">
+                Sale
               </span>
-              {product.originalPrice && (
-                <span className="text-sm text-gray-500 line-through">
-                  ${product.originalPrice}
-                </span>
-              )}
-            </div>
-            <span
-              className={`text-xs px-2 py-1 rounded ${
-                product.inStock
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
-              }`}
-            >
-              {product.inStock
-                ? `${product.stockQuantity} in stock`
-                : "Out of stock"}
-            </span>
+            )}
+            {product.isFeatured && (
+              <span className="absolute top-2 right-2 bg-yellow-500 text-white p-1 rounded">
+                <Star className="h-3 w-3" />
+              </span>
+            )}
+            <button className="absolute top-2 right-8 bg-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Heart className="h-4 w-4" />
+            </button>
           </div>
 
-          <Button className="w-full" disabled={!product.inStock}>
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            {product.inStock ? "Add to Cart" : "Out of Stock"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+          <div className="p-4">
+            <Link href={`/products/${product.id}`}>
+              <h3 className="font-semibold text-lg mb-1 line-clamp-2 hover:text-blue-600">
+                {product.name}
+              </h3>
+            </Link>
+            <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+              {product.description}
+            </p>
 
-  const ProductListItem = ({
-    product,
-  }: {
-    product: (typeof STATIC_PRODUCTS)[0];
-  }) => (
-    <Card className="mb-4">
-      <CardContent className="p-4">
-        <div className="flex gap-4">
-          <img
-            src={product.image}
-            alt={product.name}
-            className="w-24 h-24 object-cover rounded"
-          />
-          <div className="flex-1">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-semibold text-lg">{product.name}</h3>
-                <p className="text-gray-600 text-sm mb-2">
-                  {product.description}
-                </p>
-                <div className="flex items-center gap-1 mb-2">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-4 w-4 ${
-                          i < Math.floor(product.rating)
-                            ? "text-yellow-400 fill-current"
-                            : "text-gray-300"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm text-gray-500">
-                    ({product.reviews})
-                  </span>
-                </div>
+            <div className="flex items-center gap-1 mb-2">
+              <div className="flex">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`h-4 w-4 ${
+                      i < Math.floor(product.averageRating)
+                        ? "text-yellow-400 fill-current"
+                        : "text-gray-300"
+                    }`}
+                  />
+                ))}
               </div>
-              <div className="text-right">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xl font-bold text-green-600">
-                    ${product.price}
+              <span className="text-sm text-gray-500">
+                ({product.reviewCount})
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-green-600">
+                  ${discountedPrice || price}
+                </span>
+                {isOnSale && (
+                  <span className="text-sm text-gray-500 line-through">
+                    ${price}
                   </span>
-                  {product.originalPrice && (
-                    <span className="text-sm text-gray-500 line-through">
-                      ${product.originalPrice}
+                )}
+              </div>
+              <span
+                className={`text-xs px-2 py-1 rounded ${
+                  inStock
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                {inStock ? `${product.stockQuantity} in stock` : "Out of stock"}
+              </span>
+            </div>
+
+            <Button className="w-full" disabled={!inStock}>
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              {inStock ? "Add to Cart" : "Out of Stock"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const ProductListItem = ({ product }: { product: Product }) => {
+    const price = parseFloat(product.price);
+    const discountedPrice = product.discountedPrice
+      ? parseFloat(product.discountedPrice)
+      : null;
+    const isOnSale = discountedPrice && discountedPrice < price;
+    const inStock = product.stockQuantity > 0;
+
+    const imageUrl = product.thumbnailUrl || product.imageUrls[0];
+    const fullImageUrl = imageUrl
+      ? `${BASE_URL}${imageUrl}`
+      : "/api/placeholder/300/300";
+
+    return (
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <div className="flex gap-4">
+            <Link href={`/products/${product.id}`}>
+              <Image
+                src={fullImageUrl}
+                alt={product.name}
+                width={100}
+                height={100}
+                className="w-24 h-24 object-cover rounded"
+              />
+            </Link>
+            <div className="flex-1">
+              <div className="flex justify-between items-start">
+                <div>
+                  <Link href={`/products/${product.id}`}>
+                    <h3 className="font-semibold text-lg hover:text-blue-600">
+                      {product.name}
+                    </h3>
+                  </Link>
+                  <p className="text-gray-600 text-sm mb-2">
+                    {product.description}
+                  </p>
+                  <div className="flex items-center gap-1 mb-2">
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${
+                            i < Math.floor(product.averageRating)
+                              ? "text-yellow-400 fill-current"
+                              : "text-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-gray-500">
+                      ({product.reviewCount})
                     </span>
-                  )}
+                  </div>
                 </div>
-                <span
-                  className={`text-xs px-2 py-1 rounded ${
-                    product.inStock
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {product.inStock
-                    ? `${product.stockQuantity} in stock`
-                    : "Out of stock"}
+                <div className="text-right">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl font-bold text-green-600">
+                      ${discountedPrice || price}
+                    </span>
+                    {isOnSale && (
+                      <span className="text-sm text-gray-500 line-through">
+                        ${price}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      inStock
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {inStock
+                      ? `${product.stockQuantity} in stock`
+                      : "Out of stock"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-3">
+                <span className="text-sm text-gray-500">
+                  {product.category?.name}
                 </span>
+                <Button disabled={!inStock} size="sm">
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  {inStock ? "Add to Cart" : "Out of Stock"}
+                </Button>
               </div>
             </div>
-            <div className="flex justify-between items-center mt-3">
-              <span className="text-sm text-gray-500">{product.category}</span>
-              <Button disabled={!product.inStock} size="sm">
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                {product.inStock ? "Add to Cart" : "Out of Stock"}
-              </Button>
-            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <MainLayout>
@@ -471,7 +564,7 @@ export default function ProductsPage() {
                 <div className="mb-6">
                   <h4 className="font-medium mb-3">Categories</h4>
                   <div className="space-y-2">
-                    {STATIC_CATEGORIES.map((category) => (
+                    {categories.map((category) => (
                       <button
                         key={category.id}
                         onClick={() => setSelectedCategory(category.id)}
@@ -483,9 +576,11 @@ export default function ProductsPage() {
                       >
                         <div className="flex justify-between">
                           <span>{category.name}</span>
-                          <span className="text-gray-500">
-                            ({category.count})
-                          </span>
+                          {category.productCount && (
+                            <span className="text-gray-500">
+                              ({category.productCount})
+                            </span>
+                          )}
                         </div>
                       </button>
                     ))}
@@ -550,46 +645,70 @@ export default function ProductsPage() {
 
           {/* Products Grid/List */}
           <div className="flex-1">
-            <div className="mb-4 flex justify-between items-center">
-              <p className="text-gray-600">
-                Showing {filteredAndSortedProducts.length} of{" "}
-                {STATIC_PRODUCTS.length} products
-              </p>
-            </div>
-
-            {viewMode === "grid" ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredAndSortedProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-            ) : (
-              <div>
-                {filteredAndSortedProducts.map((product) => (
-                  <ProductListItem key={product.id} product={product} />
-                ))}
+            {loading && (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Loading products...</span>
               </div>
             )}
 
-            {filteredAndSortedProducts.length === 0 && (
+            {error && (
               <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">
-                  No products found matching your criteria.
-                </p>
+                <p className="text-red-500 text-lg">{error}</p>
                 <Button
                   variant="outline"
                   className="mt-4"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setSelectedCategory("1");
-                    setShowOnlyInStock(false);
-                    setShowOnlyOnSale(false);
-                    setPriceRange({ min: 0, max: 50 });
-                  }}
+                  onClick={() => window.location.reload()}
                 >
-                  Clear all filters
+                  Try Again
                 </Button>
               </div>
+            )}
+
+            {!loading && !error && (
+              <>
+                <div className="mb-4 flex justify-between items-center">
+                  <p className="text-gray-600">
+                    Showing {filteredAndSortedProducts.length} of{" "}
+                    {totalProducts} products
+                  </p>
+                </div>
+
+                {viewMode === "grid" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredAndSortedProducts.map((product) => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
+                  </div>
+                ) : (
+                  <div>
+                    {filteredAndSortedProducts.map((product) => (
+                      <ProductListItem key={product.id} product={product} />
+                    ))}
+                  </div>
+                )}
+
+                {filteredAndSortedProducts.length === 0 && !loading && (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500 text-lg">
+                      No products found matching your criteria.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => {
+                        setSearchTerm("");
+                        setSelectedCategory("all");
+                        setShowOnlyInStock(false);
+                        setShowOnlyOnSale(false);
+                        setPriceRange({ min: 0, max: 1000 });
+                      }}
+                    >
+                      Clear all filters
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
