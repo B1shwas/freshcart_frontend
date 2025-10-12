@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart, User, Search, Menu, Leaf } from "lucide-react";
+import { User, Search, Menu, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppStore } from "@/store/app";
 import { useAuthStore } from "@/store/auth";
+import { CartDropdown } from "@/components/cart-dropdown";
 
 export function Header() {
-  const { cartCount, searchQuery, setSearchQuery, toggleCart } = useAppStore();
+  const { searchQuery, setSearchQuery } = useAppStore();
   const { isAuthenticated, user, logout } = useAuthStore();
 
   return (
@@ -95,19 +96,7 @@ export function Header() {
             )}
 
             {/* Cart */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              onClick={toggleCart}
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </Button>
+            <CartDropdown />
           </div>
         </div>
 

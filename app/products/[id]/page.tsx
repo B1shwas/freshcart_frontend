@@ -21,38 +21,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MainLayout } from "@/components/main-layout";
 import { ProductApi, type RelatedProductsParams } from "@/lib/api/products";
-
-// Product types based on backend response
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: string;
-  discountedPrice?: string;
-  discountPercentage?: string;
-  imageUrls: string[];
-  thumbnailUrl?: string;
-  categoryId: string;
-  stockQuantity: number;
-  unit: string;
-  isFeatured: boolean;
-  averageRating: number;
-  reviewCount: number;
-  isActive: boolean;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-  category?: {
-    id: string;
-    name: string;
-  };
-}
+import { useCartStore } from "@/store/cart";
+import { useAuthStore } from "@/store/auth";
+import { useToast } from "@/components/toast-provider";
+import { formatPrice, parsePrice } from "@/lib/utils";
+import type { Product } from "@/types/api";
 
 const BASE_URL = "http://localhost:3001";
 
 export default function ProductDetailPage() {
   const params = useParams();
   const productId = params.id as string;
+
+  // Auth and cart stores
+  const { token, isAuthenticated } = useAuthStore();
+  const { debouncedAddToCart, addToLocalCart } = useCartStore();
+  const { addToast } = useToast();
 
   // State
   const [product, setProduct] = useState<Product | null>(null);
@@ -98,12 +82,33 @@ export default function ProductDetailPage() {
 
     setIsAddingToCart(true);
     try {
-      // TODO: Implement add to cart API call
-      console.log(`Adding ${quantity} of ${product.name} to cart`);
-      // Add success notification here
+      if (isAuthenticated && token) {
+        // Add to backend cart for authenticated users (debounced)
+        await debouncedAddToCart(token, product.id, quantity);
+      } else {
+        // Add to local cart for guest users
+        addToLocalCart(product, quantity);
+      }
+
+      // Reset quantity to 1 after successful add
+      setQuantity(1);
+
+      // Show success notification
+      addToast({
+        type: "success",
+        message: `Added ${quantity} of ${product.name} to cart!`,
+        duration: 3000,
+      });
     } catch (err) {
       console.error("Error adding to cart:", err);
-      // Add error notification here
+      // Only show error toast for actual errors, not debounce cancellations
+      if (err instanceof Error && !err.message.includes("superseded")) {
+        addToast({
+          type: "error",
+          message: "Failed to add item to cart. Please try again.",
+          duration: 4000,
+        });
+      }
     } finally {
       setIsAddingToCart(false);
     }
@@ -142,20 +147,16 @@ export default function ProductDetailPage() {
     );
   }
 
-  const price = parseFloat(product.price);
-  const discountedPrice = product.discountedPrice
-    ? parseFloat(product.discountedPrice)
-    : null;
-  const isOnSale = discountedPrice && discountedPrice < price;
+  const price = parsePrice(product.price);
+  const discountedPrice = parsePrice(product.discountedPrice);
+  const isOnSale = discountedPrice > 0 && discountedPrice < price;
   const inStock = product.stockQuantity > 0;
-  const currentPrice = discountedPrice || price;
+  const currentPrice = isOnSale ? discountedPrice : price;
 
   const images =
-    product.imageUrls.length > 0
-      ? product.imageUrls
-      : [product.thumbnailUrl].filter(Boolean);
-  const displayImages = images.map((url) =>
-    url ? `${BASE_URL}${url}` : "/api/placeholder/600/600"
+    product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : [];
+  const displayImages = images.map((url: string) =>
+    url.startsWith("http") ? url : `${BASE_URL}${url}`
   );
 
   return (
@@ -241,7 +242,7 @@ export default function ProductDetailPage() {
                       <Star
                         key={i}
                         className={`h-5 w-5 ${
-                          i < Math.floor(product.averageRating)
+                          i < Math.floor(product.rating || 0)
                             ? "text-yellow-400 fill-current"
                             : "text-gray-300"
                         }`}
@@ -249,7 +250,7 @@ export default function ProductDetailPage() {
                     ))}
                   </div>
                   <span className="text-lg font-medium">
-                    {product.averageRating.toFixed(1)}
+                    {(product.rating || 0).toFixed(1)}
                   </span>
                   <span className="text-gray-500">
                     ({product.reviewCount} reviews)
@@ -265,16 +266,16 @@ export default function ProductDetailPage() {
               {/* Price */}
               <div className="flex items-center gap-3 mb-6">
                 <span className="text-3xl font-bold text-green-600">
-                  ${currentPrice.toFixed(2)}
+                  {formatPrice(currentPrice)}
                 </span>
                 {isOnSale && (
                   <span className="text-xl text-gray-500 line-through">
-                    ${price.toFixed(2)}
+                    {formatPrice(price)}
                   </span>
                 )}
                 {isOnSale && (
                   <span className="bg-red-100 text-red-800 px-2 py-1 text-sm rounded">
-                    Save ${(price - currentPrice).toFixed(2)}
+                    Save {formatPrice(price - currentPrice)}
                   </span>
                 )}
               </div>
@@ -353,23 +354,6 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {/* Tags */}
-              {product.tags.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="font-medium mb-2">Tags:</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {product.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="bg-gray-100 text-gray-700 px-2 py-1 text-xs rounded"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Features */}
               <div className="mt-8 space-y-3 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
@@ -395,17 +379,16 @@ export default function ProductDetailPage() {
             <h2 className="text-2xl font-bold mb-6">Related Products</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {relatedProducts.map((relatedProduct) => {
-                const relatedPrice = parseFloat(relatedProduct.price);
+                const relatedPrice = relatedProduct.price;
                 const relatedDiscountedPrice = relatedProduct.discountedPrice
-                  ? parseFloat(relatedProduct.discountedPrice)
+                  ? relatedProduct.discountedPrice
                   : null;
                 const relatedIsOnSale =
                   relatedDiscountedPrice &&
                   relatedDiscountedPrice < relatedPrice;
                 const relatedInStock = relatedProduct.stockQuantity > 0;
 
-                const relatedImageUrl =
-                  relatedProduct.thumbnailUrl || relatedProduct.imageUrls[0];
+                const relatedImageUrl = relatedProduct.imageUrls[0];
                 const relatedFullImageUrl = relatedImageUrl
                   ? `${BASE_URL}${relatedImageUrl}`
                   : "/api/placeholder/300/300";
@@ -446,7 +429,7 @@ export default function ProductDetailPage() {
                               <Star
                                 key={i}
                                 className={`h-4 w-4 ${
-                                  i < Math.floor(relatedProduct.averageRating)
+                                  i < Math.floor(relatedProduct.rating)
                                     ? "text-yellow-400 fill-current"
                                     : "text-gray-300"
                                 }`}

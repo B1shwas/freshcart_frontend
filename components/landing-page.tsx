@@ -205,9 +205,7 @@ export function LandingPage() {
                     <CardContent className="p-6 text-center">
                       <div className="relative mb-4">
                         <Image
-                          src={`http://localhost:3001${getCategoryImage(
-                            category
-                          )}`}
+                          src={`http://localhost:3001${category.imageUrl}`}
                           alt={category.imageUrl || "fie"}
                           width={80}
                           height={80}
@@ -278,30 +276,34 @@ export function LandingPage() {
                 return (
                   <Card
                     key={product.id}
-                    className="group cursor-pointer hover:shadow-lg transition-shadow duration-300"
+                    className="group hover:shadow-lg transition-shadow duration-300"
                   >
                     <CardContent className="p-0">
-                      <div className="relative">
-                        <Image
-                          src={`http://localhost:3001${getProductImage(
-                            product
-                          )}`}
-                          alt={product.name}
-                          width={300}
-                          height={300}
-                          className="w-full h-48 object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-300"
-                        />
-                        {discount && (
-                          <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-xs font-semibold">
-                            -{discount}%
-                          </span>
-                        )}
-                      </div>
+                      <Link href={`/products/${product.id}`}>
+                        <div className="relative cursor-pointer">
+                          <Image
+                            src={`http://localhost:3001${getProductImage(
+                              product
+                            )}`}
+                            alt={product.name}
+                            width={300}
+                            height={300}
+                            className="w-full h-48 object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-300"
+                          />
+                          {discount && (
+                            <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-xs font-semibold">
+                              -{discount}%
+                            </span>
+                          )}
+                        </div>
+                      </Link>
 
                       <div className="p-4">
-                        <h3 className="font-semibold text-gray-900 mb-2">
-                          {product.name}
-                        </h3>
+                        <Link href={`/products/${product.id}`}>
+                          <h3 className="font-semibold text-gray-900 mb-2 cursor-pointer hover:text-blue-600 transition-colors">
+                            {product.name}
+                          </h3>
+                        </Link>
 
                         {/* Since we don't have rating in backend yet, show placeholder */}
                         <div className="flex items-center mb-2">

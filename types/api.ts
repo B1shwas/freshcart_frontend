@@ -57,7 +57,8 @@ export interface Product {
   price: number;
   discountedPrice?: number;
   discountPercentage?: number;
-  images: string[];
+  imageUrls: string[];
+  thumbnailUrl?: string;
   categoryId: string;
   category: Category;
   stockQuantity: number;
